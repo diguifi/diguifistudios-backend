@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\Diguifi.Domain\Diguifi.Domain.csproj" />
+  </ItemGroup>
+</Project>
