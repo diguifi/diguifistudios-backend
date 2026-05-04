@@ -1,11 +1,30 @@
 using System.Security.Claims;
 using System.Text.Json;
 using Diguifi.Infrastructure;
+using Diguifi.Api.Configuration;
 using Diguifi.Infrastructure.Options;
 using Diguifi.Infrastructure.Persistence;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Configuration.Sources.Clear();
+builder.Configuration
+    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true);
+
+if (builder.Environment.IsDevelopment())
+{
+    var localEnvironmentVariables = DotEnvConfigurationLoader.Load(builder.Environment.ContentRootPath);
+    if (localEnvironmentVariables.Count > 0)
+    {
+        builder.Configuration.AddInMemoryCollection(localEnvironmentVariables);
+    }
+}
+
+builder.Configuration
+    .AddEnvironmentVariables()
+    .AddCommandLine(args);
 
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddControllers()
