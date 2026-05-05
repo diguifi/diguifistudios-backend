@@ -20,8 +20,8 @@ public sealed class AuthEndpointsTests : IClassFixture<WebApplicationFactory<Pro
     {
         var response = await _client.PostAsJsonAsync("/api/auth/google", new
         {
-            credential = "stub-token",
-            callbackPath = "/auth/callback"
+            idToken = "stub-token",
+            credential = "stub-token"
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);

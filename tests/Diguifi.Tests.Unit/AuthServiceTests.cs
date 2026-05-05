@@ -43,7 +43,11 @@ public sealed class AuthServiceTests
             SigningKey = "01234567890123456789012345678901"
         }));
 
-        var result = await service.AuthenticateWithGoogleAsync(new GoogleAuthRequest { Credential = "token" }, null, null, CancellationToken.None);
+        var result = await service.AuthenticateWithGoogleAsync(new GoogleAuthRequest
+        {
+            IdToken = "token",
+            Credential = "token"
+        }, null, null, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().NotBeNull();

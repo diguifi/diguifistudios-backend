@@ -9,7 +9,7 @@ public sealed class Order
     public string ProductId { get; set; } = string.Empty;
     public OrderStatus Status { get; set; } = OrderStatus.Pending;
     public decimal Amount { get; set; }
-    public string Currency { get; set; } = "USD";
+    public string Currency { get; set; } = "BRL";
     public string? StripeCheckoutSessionId { get; set; }
     public string? StripePaymentIntentId { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;

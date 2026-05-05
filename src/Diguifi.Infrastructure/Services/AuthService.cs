@@ -23,15 +23,10 @@ public sealed class AuthService(
         string? userAgent,
         CancellationToken cancellationToken)
     {
-        if (!string.IsNullOrWhiteSpace(request.Error))
-        {
-            return Result<AuthResponse>.Failure("google_auth_failed", "Google retornou erro na autenticação.", request.Error);
-        }
-
-        var identity = await googleTokenValidator.ValidateAsync(request.Code, request.Credential, cancellationToken);
+        var identity = await googleTokenValidator.ValidateAsync(request.IdToken, request.Credential, cancellationToken);
         if (identity is null)
         {
-            return Result<AuthResponse>.Failure("invalid_google_token", "Não foi possível validar o token do Google.");
+            return Result<AuthResponse>.Failure("invalid_google_token", "Nao foi possivel validar o token do Google.");
         }
 
         var user = await dbContext.Users
@@ -88,7 +83,7 @@ public sealed class AuthService(
     {
         if (string.IsNullOrWhiteSpace(refreshToken))
         {
-            return Result<RefreshResponse>.Failure("missing_refresh_token", "Refresh token não informado.");
+            return Result<RefreshResponse>.Failure("missing_refresh_token", "Refresh token nao informado.");
         }
 
         var tokenHash = tokenService.ComputeHash(refreshToken);
@@ -98,7 +93,7 @@ public sealed class AuthService(
 
         if (storedToken is null || !storedToken.IsActive || storedToken.User is null)
         {
-            return Result<RefreshResponse>.Failure("invalid_refresh_token", "Refresh token inválido, expirado ou revogado.");
+            return Result<RefreshResponse>.Failure("invalid_refresh_token", "Refresh token invalido, expirado ou revogado.");
         }
 
         storedToken.RevokedAt = DateTimeOffset.UtcNow;
@@ -148,7 +143,7 @@ public sealed class AuthService(
     {
         var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
         return user is null
-            ? Result<UserProfileResponse>.Failure("user_not_found", "Usuário autenticado não encontrado.")
+            ? Result<UserProfileResponse>.Failure("user_not_found", "Usuario autenticado nao encontrado.")
             : Result<UserProfileResponse>.Success(MapUser(user));
     }
 

@@ -4,9 +4,9 @@ namespace Diguifi.Infrastructure.Services;
 
 public sealed class GoogleTokenValidatorStub : IGoogleTokenValidator
 {
-    public Task<GoogleIdentity?> ValidateAsync(string? code, string? credential, CancellationToken cancellationToken)
+    public Task<GoogleIdentity?> ValidateAsync(string? idToken, string? credential, CancellationToken cancellationToken)
     {
-        var token = credential ?? code;
+        var token = idToken ?? credential;
         if (string.IsNullOrWhiteSpace(token))
         {
             return Task.FromResult<GoogleIdentity?>(null);
