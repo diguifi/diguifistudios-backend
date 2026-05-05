@@ -4,13 +4,12 @@ public static class DotEnvConfigurationLoader
 {
     public static IReadOnlyDictionary<string, string?> Load(string contentRootPath)
     {
-        var envFilePath = Path.Combine(contentRootPath, ".env");
-        if (!File.Exists(envFilePath))
-        {
-            return new Dictionary<string, string?>();
-        }
-
         var values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        var envFilePath = FindEnvFile(contentRootPath);
+        if (envFilePath is null)
+        {
+            return values;
+        }
 
         foreach (var rawLine in File.ReadAllLines(envFilePath))
         {
@@ -31,7 +30,7 @@ public static class DotEnvConfigurationLoader
                 continue;
             }
 
-            var key = line[..separatorIndex].Trim();
+            var key = NormalizeKey(line[..separatorIndex].Trim());
             if (string.IsNullOrWhiteSpace(key))
             {
                 continue;
@@ -42,6 +41,29 @@ public static class DotEnvConfigurationLoader
         }
 
         return values;
+    }
+
+    private static string? FindEnvFile(string contentRootPath)
+    {
+        var directory = new DirectoryInfo(contentRootPath);
+
+        while (directory is not null)
+        {
+            var envFilePath = Path.Combine(directory.FullName, ".env");
+            if (File.Exists(envFilePath))
+            {
+                return envFilePath;
+            }
+
+            directory = directory.Parent;
+        }
+
+        return null;
+    }
+
+    private static string NormalizeKey(string key)
+    {
+        return key.Replace("__", ":", StringComparison.Ordinal);
     }
 
     private static string? Unquote(string value)

@@ -5,6 +5,7 @@ using Diguifi.Api.Configuration;
 using Diguifi.Infrastructure.Options;
 using Diguifi.Infrastructure.Persistence;
 using Microsoft.OpenApi.Models;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -114,7 +115,7 @@ app.MapControllers();
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await dbContext.Database.EnsureCreatedAsync();
+    await dbContext.Database.MigrateAsync();
     await DbSeeder.SeedAsync(dbContext, CancellationToken.None);
 }
 
