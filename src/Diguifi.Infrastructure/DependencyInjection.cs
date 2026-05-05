@@ -1,4 +1,5 @@
 using System.Text;
+using System.Data.Common;
 using Diguifi.Application.Interfaces;
 using Diguifi.Infrastructure.Options;
 using Diguifi.Infrastructure.Persistence;
@@ -20,8 +21,10 @@ public static class DependencyInjection
         services.Configure<StripeOptions>(configuration.GetSection(StripeOptions.SectionName));
         services.Configure<FrontendOptions>(configuration.GetSection(FrontendOptions.SectionName));
 
+        var connectionString = NormalizePostgresConnectionString(configuration.GetConnectionString("Default"));
         services.AddDbContext<AppDbContext>(options =>
-            options.UseSqlServer(configuration.GetConnectionString("Default")));
+            options.UseNpgsql(connectionString, npgsqlOptions =>
+                npgsqlOptions.EnableRetryOnFailure()));
 
         services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -52,5 +55,41 @@ public static class DependencyInjection
         services.AddSingleton<IStripeCheckoutGateway, StripeCheckoutGatewayStub>();
 
         return services;
+    }
+
+    private static string NormalizePostgresConnectionString(string? connectionString)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException("A connection string 'ConnectionStrings:Default' deve ser configurada.");
+        }
+
+        var builder = new DbConnectionStringBuilder
+        {
+            ConnectionString = connectionString
+        };
+
+        Remap(builder, "Server", "Host");
+        Remap(builder, "Data Source", "Host");
+        Remap(builder, "User ID", "Username");
+        Remap(builder, "User", "Username");
+
+        if (!builder.ContainsKey("Ssl Mode") && !builder.ContainsKey("SSL Mode") && !builder.ContainsKey("sslmode"))
+        {
+            builder["Ssl Mode"] = "Require";
+        }
+
+        return builder.ConnectionString;
+    }
+
+    private static void Remap(DbConnectionStringBuilder builder, string sourceKey, string targetKey)
+    {
+        if (!builder.TryGetValue(sourceKey, out var value) || builder.ContainsKey(targetKey))
+        {
+            return;
+        }
+
+        builder.Remove(sourceKey);
+        builder[targetKey] = value;
     }
 }
