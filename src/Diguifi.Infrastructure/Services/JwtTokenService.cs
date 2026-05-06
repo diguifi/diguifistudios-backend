@@ -14,6 +14,12 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options) : ITokenServic
 {
     private readonly JwtOptions _options = options.Value;
 
+    internal static readonly HashSet<string> AdminEmails = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "lumia-diguifi@hotmail.com",
+        "diego.penha95@gmail.com"
+    };
+
     public (string Token, DateTimeOffset ExpiresAt) CreateAccessToken(User user)
     {
         var expiresAt = DateTimeOffset.UtcNow.AddMinutes(_options.AccessTokenMinutes);
@@ -24,6 +30,11 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options) : ITokenServic
             new("name", user.Name),
             new("first_name", user.FirstName)
         };
+
+        if (AdminEmails.Contains(user.Email))
+        {
+            claims.Add(new Claim(ClaimTypes.Role, "admin"));
+        }
 
         var credentials = new SigningCredentials(
             new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey)),

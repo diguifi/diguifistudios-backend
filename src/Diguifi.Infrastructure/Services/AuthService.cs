@@ -153,6 +153,7 @@ public sealed class AuthService(
         Email = user.Email,
         Name = user.Name,
         FirstName = user.FirstName,
-        AvatarUrl = user.AvatarUrl
+        AvatarUrl = user.AvatarUrl,
+        IsAdmin = JwtTokenService.AdminEmails.Contains(user.Email)
     };
 }
