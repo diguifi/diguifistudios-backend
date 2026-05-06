@@ -15,13 +15,15 @@ public sealed class AuthEndpointsTests : IClassFixture<WebApplicationFactory<Pro
         _client = factory.CreateClient();
     }
 
-    [Fact(Skip = "Requer SDK .NET instalado e ajuste do host de teste para banco/configuração.")]
+    [Fact(Skip = "Requer SDK .NET instalado, banco/configuracao do host de teste e um token real em TEST_GOOGLE_ID_TOKEN.")]
     public async Task GoogleLogin_ShouldReturnOk()
     {
+        var googleIdToken = Environment.GetEnvironmentVariable("TEST_GOOGLE_ID_TOKEN") ?? string.Empty;
+
         var response = await _client.PostAsJsonAsync("/api/auth/google", new
         {
-            idToken = "stub-token",
-            credential = "stub-token"
+            idToken = googleIdToken,
+            credential = googleIdToken
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);

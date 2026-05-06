@@ -70,6 +70,15 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("frontend", policy =>
     {
+        if (builder.Environment.IsDevelopment())
+        {
+            policy.SetIsOriginAllowed(_ => true)
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials();
+            return;
+        }
+
         var frontendBaseUrl = builder.Configuration.GetSection(FrontendOptions.SectionName).Get<FrontendOptions>()?.BaseUrl;
         if (!string.IsNullOrWhiteSpace(frontendBaseUrl))
         {

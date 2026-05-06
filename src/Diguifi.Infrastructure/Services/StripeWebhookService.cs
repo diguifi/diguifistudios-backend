@@ -1,29 +1,46 @@
-using System.Text.Json;
 using Diguifi.Application.Common;
 using Diguifi.Application.Interfaces;
 using Diguifi.Domain.Entities;
 using Diguifi.Domain.Enums;
+using Diguifi.Infrastructure.Options;
 using Diguifi.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Stripe;
+using Stripe.Checkout;
 
 namespace Diguifi.Infrastructure.Services;
 
-public sealed class StripeWebhookService(AppDbContext dbContext) : IStripeWebhookService
+public sealed class StripeWebhookService(
+    AppDbContext dbContext,
+    IOptions<StripeOptions> stripeOptions) : IStripeWebhookService
 {
+    private readonly StripeOptions _stripeOptions = stripeOptions.Value;
+
     public async Task<Result<bool>> ProcessAsync(string payload, string signature, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(signature))
         {
-            return Result<bool>.Failure("invalid_signature", "Assinatura do webhook não informada.");
+            return Result<bool>.Failure("invalid_signature", "Assinatura do webhook nao informada.");
         }
 
-        using var document = JsonDocument.Parse(payload);
-        var root = document.RootElement;
-        var eventId = root.GetProperty("id").GetString() ?? string.Empty;
-        var eventType = root.GetProperty("type").GetString() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(_stripeOptions.WebhookSecret))
+        {
+            return Result<bool>.Failure("missing_webhook_secret", "Stripe:WebhookSecret nao configurado.");
+        }
+
+        Event stripeEvent;
+        try
+        {
+            stripeEvent = EventUtility.ConstructEvent(payload, signature, _stripeOptions.WebhookSecret);
+        }
+        catch (StripeException)
+        {
+            return Result<bool>.Failure("invalid_signature", "Assinatura do webhook da Stripe invalida.");
+        }
 
         var existing = await dbContext.WebhookEvents
-            .FirstOrDefaultAsync(x => x.Provider == "stripe" && x.ExternalEventId == eventId, cancellationToken);
+            .FirstOrDefaultAsync(x => x.Provider == "stripe" && x.ExternalEventId == stripeEvent.Id, cancellationToken);
         if (existing is not null)
         {
             existing.Status = WebhookEventStatus.Duplicate;
@@ -35,21 +52,40 @@ public sealed class StripeWebhookService(AppDbContext dbContext) : IStripeWebhoo
         var webhookEvent = new WebhookEvent
         {
             Provider = "stripe",
-            ExternalEventId = eventId,
-            EventType = eventType,
+            ExternalEventId = stripeEvent.Id,
+            EventType = stripeEvent.Type,
             Payload = payload
         };
 
         dbContext.WebhookEvents.Add(webhookEvent);
 
-        var sessionId = TryReadSessionId(root);
+        var sessionId = TryReadSessionId(stripeEvent);
+        var paymentIntentId = TryReadPaymentIntentId(stripeEvent);
+
+        Order? order = null;
         if (!string.IsNullOrWhiteSpace(sessionId))
         {
-            var order = await dbContext.Orders.FirstOrDefaultAsync(x => x.StripeCheckoutSessionId == sessionId, cancellationToken);
-            if (order is not null)
+            order = await dbContext.Orders.FirstOrDefaultAsync(x => x.StripeCheckoutSessionId == sessionId, cancellationToken);
+        }
+
+        if (order is null && !string.IsNullOrWhiteSpace(paymentIntentId))
+        {
+            order = await dbContext.Orders.FirstOrDefaultAsync(x => x.StripePaymentIntentId == paymentIntentId, cancellationToken);
+        }
+
+        if (order is not null)
+        {
+            if (!string.IsNullOrWhiteSpace(sessionId))
             {
-                ApplyOrderTransition(order, eventType);
+                order.StripeCheckoutSessionId = sessionId;
             }
+
+            if (!string.IsNullOrWhiteSpace(paymentIntentId))
+            {
+                order.StripePaymentIntentId = paymentIntentId;
+            }
+
+            ApplyOrderTransition(order, stripeEvent.Type);
         }
 
         webhookEvent.Status = WebhookEventStatus.Processed;
@@ -58,19 +94,24 @@ public sealed class StripeWebhookService(AppDbContext dbContext) : IStripeWebhoo
         return Result<bool>.Success(true);
     }
 
-    private static string? TryReadSessionId(JsonElement root)
+    private static string? TryReadSessionId(Event stripeEvent)
     {
-        if (!root.TryGetProperty("data", out var data) || !data.TryGetProperty("object", out var @object))
+        return stripeEvent.Data.Object switch
         {
-            return null;
-        }
+            Session session => session.Id,
+            _ => null
+        };
+    }
 
-        if (@object.TryGetProperty("id", out var objectId))
+    private static string? TryReadPaymentIntentId(Event stripeEvent)
+    {
+        return stripeEvent.Data.Object switch
         {
-            return objectId.GetString();
-        }
-
-        return null;
+            Session session => session.PaymentIntentId,
+            PaymentIntent paymentIntent => paymentIntent.Id,
+            Charge charge => charge.PaymentIntentId,
+            _ => null
+        };
     }
 
     private static void ApplyOrderTransition(Order order, string eventType)
@@ -81,6 +122,7 @@ public sealed class StripeWebhookService(AppDbContext dbContext) : IStripeWebhoo
             case "payment_intent.succeeded":
                 order.Status = OrderStatus.Paid;
                 order.PaidAt = DateTimeOffset.UtcNow;
+                order.CancelledAt = null;
                 break;
             case "checkout.session.expired":
                 order.Status = OrderStatus.Expired;

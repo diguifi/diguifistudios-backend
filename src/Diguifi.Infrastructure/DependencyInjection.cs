@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Diguifi.Infrastructure;
@@ -50,9 +51,14 @@ public static class DependencyInjection
         services.AddScoped<ICheckoutService, CheckoutService>();
         services.AddScoped<IPurchaseService, PurchaseService>();
         services.AddScoped<IStripeWebhookService, StripeWebhookService>();
+        services.AddSingleton<Stripe.IStripeClient>(sp =>
+        {
+            var options = sp.GetRequiredService<IOptions<StripeOptions>>().Value;
+            return new Stripe.StripeClient(options.SecretKey);
+        });
         services.AddSingleton<ITokenService, JwtTokenService>();
-        services.AddSingleton<IGoogleTokenValidator, GoogleTokenValidatorStub>();
-        services.AddSingleton<IStripeCheckoutGateway, StripeCheckoutGatewayStub>();
+        services.AddSingleton<IGoogleTokenValidator, GoogleTokenValidator>();
+        services.AddSingleton<IStripeCheckoutGateway, StripeCheckoutGateway>();
 
         return services;
     }

@@ -56,3 +56,4 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+src/Diguifi.Api/.env
