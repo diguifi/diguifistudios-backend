@@ -36,6 +36,7 @@ Exemplos:
 - `Jwt__SigningKey`
 - `Google__ClientSecret`
 - `Stripe__WebhookSecret`
+- `Stripe__CliWebhookSecret`
 - `Frontend__BaseUrl`
 
 Para desenvolvimento local, use [src/Diguifi.Api/.env.example](/C:/Users/Casal%20Mozis/Desktop/Repos/diguifistudios-backend/src/Diguifi.Api/.env.example) como base e crie `src/Diguifi.Api/.env`.

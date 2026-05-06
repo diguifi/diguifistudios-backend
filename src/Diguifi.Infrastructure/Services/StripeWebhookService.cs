@@ -24,15 +24,16 @@ public sealed class StripeWebhookService(
             return Result<bool>.Failure("invalid_signature", "Assinatura do webhook nao informada.");
         }
 
-        if (string.IsNullOrWhiteSpace(_stripeOptions.WebhookSecret))
+        var webhookSecrets = GetWebhookSecrets();
+        if (webhookSecrets.Count == 0)
         {
-            return Result<bool>.Failure("missing_webhook_secret", "Stripe:WebhookSecret nao configurado.");
+            return Result<bool>.Failure("missing_webhook_secret", "Stripe:WebhookSecret ou Stripe:CliWebhookSecret nao configurado.");
         }
 
         Event stripeEvent;
         try
         {
-            stripeEvent = EventUtility.ConstructEvent(payload, signature, _stripeOptions.WebhookSecret);
+            stripeEvent = ConstructEvent(payload, signature, webhookSecrets);
         }
         catch (StripeException)
         {
@@ -71,6 +72,11 @@ public sealed class StripeWebhookService(
         if (order is null && !string.IsNullOrWhiteSpace(paymentIntentId))
         {
             order = await dbContext.Orders.FirstOrDefaultAsync(x => x.StripePaymentIntentId == paymentIntentId, cancellationToken);
+        }
+
+        if (order is null && TryReadOrderId(stripeEvent) is { } orderId)
+        {
+            order = await dbContext.Orders.FirstOrDefaultAsync(x => x.Id == orderId, cancellationToken);
         }
 
         if (order is not null)
@@ -112,6 +118,58 @@ public sealed class StripeWebhookService(
             Charge charge => charge.PaymentIntentId,
             _ => null
         };
+    }
+
+    private IReadOnlyList<string> GetWebhookSecrets()
+    {
+        var secrets = new List<string>(2);
+
+        if (!string.IsNullOrWhiteSpace(_stripeOptions.WebhookSecret))
+        {
+            secrets.Add(_stripeOptions.WebhookSecret);
+        }
+
+        if (!string.IsNullOrWhiteSpace(_stripeOptions.CliWebhookSecret))
+        {
+            secrets.Add(_stripeOptions.CliWebhookSecret);
+        }
+
+        return secrets;
+    }
+
+    private static Event ConstructEvent(string payload, string signature, IReadOnlyList<string> webhookSecrets)
+    {
+        StripeException? lastException = null;
+
+        foreach (var webhookSecret in webhookSecrets)
+        {
+            try
+            {
+                // Stripe CLI sends events with the account's API version (2026-03-25.dahlia),
+                // which may differ from Stripe.net's current version (2026-04-22.dahlia).
+                // HMAC signature is still fully validated regardless.
+                return EventUtility.ConstructEvent(payload, signature, webhookSecret, throwOnApiVersionMismatch: false);
+            }
+            catch (StripeException ex)
+            {
+                lastException = ex;
+            }
+        }
+
+        throw lastException ?? new StripeException("Unable to validate Stripe webhook signature.");
+    }
+
+    private static Guid? TryReadOrderId(Event stripeEvent)
+    {
+        var orderId = stripeEvent.Data.Object switch
+        {
+            Session session => session.Metadata?.GetValueOrDefault("orderId"),
+            PaymentIntent paymentIntent => paymentIntent.Metadata?.GetValueOrDefault("orderId"),
+            Charge charge => charge.Metadata?.GetValueOrDefault("orderId"),
+            _ => null
+        };
+
+        return Guid.TryParse(orderId, out var parsedOrderId) ? parsedOrderId : null;
     }
 
     private static void ApplyOrderTransition(Order order, string eventType)

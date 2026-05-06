@@ -9,4 +9,5 @@ public sealed class ProductResponse
     public string Currency { get; set; } = "USD";
     public string Category { get; set; } = string.Empty;
     public bool IsActive { get; set; }
+    public bool IsPurchased { get; set; }
 }

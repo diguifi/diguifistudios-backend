@@ -20,8 +20,8 @@ public static class DbSeeder
             Name = "Supporter Pack",
             Description = "Pacote base para apoiar a Diguifi Studios.",
             Category = ProductCategory.Bundle,
-            Price = 4.99m,
-            Currency = "USD",
+            Price = 10.0m,
+            Currency = "BRL",
             IsActive = true
         });
 

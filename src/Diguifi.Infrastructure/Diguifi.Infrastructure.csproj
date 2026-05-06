@@ -13,6 +13,6 @@
     </PackageReference>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0-preview.3" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0-preview.3.25172.1" />
-    <PackageReference Include="Stripe.net" Version="49.0.0" />
+    <PackageReference Include="Stripe.net" Version="51.1.0" />
   </ItemGroup>
 </Project>

@@ -15,7 +15,7 @@ public sealed class ProductsController(
     [HttpGet]
     [ProducesResponseType<IReadOnlyCollection<ProductResponse>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> Get(CancellationToken cancellationToken)
-        => Ok(await productService.GetProductsAsync(cancellationToken));
+        => Ok(await productService.GetProductsAsync(Program.TryGetUserId(User), cancellationToken));
 
     [HttpGet("{id}")]
     [ProducesResponseType<ProductResponse>(StatusCodes.Status200OK)]
