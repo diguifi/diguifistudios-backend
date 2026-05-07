@@ -57,3 +57,6 @@ CodeCoverage/
 TestResult.xml
 nunit-*.xml
 src/Diguifi.Api/.env
+
+coverage-results*
+coverage-results/*
