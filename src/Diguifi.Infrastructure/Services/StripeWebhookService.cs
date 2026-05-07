@@ -109,7 +109,7 @@ public sealed class StripeWebhookService(
                 }
             }
 
-            ApplyOrderTransition(order, stripeEvent.Type);
+            ApplyOrderTransition(order, stripeEvent);
         }
 
         webhookEvent.Status = WebhookEventStatus.Processed;
@@ -190,15 +190,16 @@ public sealed class StripeWebhookService(
         return Guid.TryParse(orderId, out var parsedOrderId) ? parsedOrderId : null;
     }
 
-    private static void ApplyOrderTransition(Order order, string eventType)
+    private static void ApplyOrderTransition(Order order, Event stripeEvent)
     {
-        switch (eventType)
+        switch (stripeEvent.Type)
         {
             case "checkout.session.completed":
             case "payment_intent.succeeded":
                 order.Status = OrderStatus.Paid;
                 order.PaidAt = DateTimeOffset.UtcNow;
                 order.CancelledAt = null;
+                order.CancelAtPeriodEnd = false;
                 break;
             case "checkout.session.expired":
                 order.Status = OrderStatus.Expired;
@@ -210,9 +211,14 @@ public sealed class StripeWebhookService(
             case "charge.refunded":
                 order.Status = OrderStatus.Refunded;
                 break;
+            case "customer.subscription.updated":
+                if (stripeEvent.Data.Object is Subscription updatedSub)
+                    order.CancelAtPeriodEnd = updatedSub.CancelAtPeriodEnd;
+                break;
             case "customer.subscription.deleted":
                 order.Status = OrderStatus.Cancelled;
                 order.CancelledAt = DateTimeOffset.UtcNow;
+                order.CancelAtPeriodEnd = false;
                 break;
         }
     }

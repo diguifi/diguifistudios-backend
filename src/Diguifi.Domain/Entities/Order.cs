@@ -16,6 +16,7 @@ public sealed class Order
     public DateTimeOffset? PaidAt { get; set; }
     public DateTimeOffset? CancelledAt { get; set; }
     public string? StripeSubscriptionId { get; set; }
+    public bool CancelAtPeriodEnd { get; set; }
 
     public User? User { get; set; }
     public Product? Product { get; set; }

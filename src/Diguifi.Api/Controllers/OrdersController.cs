@@ -37,7 +37,8 @@ public sealed class OrdersController(
                 amount = x.Amount,
                 currency = x.Currency,
                 createdAt = x.CreatedAt,
-                paidAt = x.PaidAt
+                paidAt = x.PaidAt,
+                cancelAtPeriodEnd = x.CancelAtPeriodEnd
             })
             .ToListAsync(cancellationToken);
 
@@ -78,9 +79,11 @@ public sealed class OrdersController(
         var result = await orderService.CancelSubscriptionAsync(orderId, userId.Value, returnUrl, cancellationToken);
 
         if (!result.IsSuccess)
-            return result.Error!.Code == "order_not_found"
-                ? NotFound(result.Error)
-                : BadRequest(result.Error);
+        {
+            if (result.Error!.Code == "order_not_found") return NotFound(result.Error);
+            if (result.Error!.Code == "already_cancelling") return Conflict(result.Error);
+            return BadRequest(result.Error);
+        }
 
         return Ok(result.Value);
     }

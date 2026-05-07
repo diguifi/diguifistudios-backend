@@ -4,6 +4,7 @@ using Diguifi.Application.Interfaces;
 using Diguifi.Domain.Enums;
 using Diguifi.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Stripe;
 
 namespace Diguifi.Infrastructure.Services;
 
@@ -22,6 +23,9 @@ public sealed class OrderService(AppDbContext dbContext, IStripeBillingPortalGat
 
         if (order.Status != OrderStatus.Paid)
             return Result<CancelSubscriptionResponse>.Failure("order_not_paid", "Pedido nao foi pago.");
+
+        if (order.CancelAtPeriodEnd)
+            return Result<CancelSubscriptionResponse>.Failure("already_cancelling", "Assinatura ja esta agendada para cancelamento.");
 
         if (order.Product?.Category != ProductCategory.Subscription)
             return Result<CancelSubscriptionResponse>.Failure("not_subscription", "Produto nao e uma assinatura.");
@@ -56,13 +60,20 @@ public sealed class OrderService(AppDbContext dbContext, IStripeBillingPortalGat
         if (string.IsNullOrWhiteSpace(customerId))
             return Result<CancelSubscriptionResponse>.Failure("no_customer", "Usuario nao possui customer ID no Stripe.");
 
-        var portalUrl = await portalGateway.CreatePortalSessionAsync(
-            customerId,
-            subscriptionId ?? string.Empty,
-            returnUrl,
-            ct);
+        try
+        {
+            var portalUrl = await portalGateway.CreatePortalSessionAsync(
+                customerId,
+                subscriptionId ?? string.Empty,
+                returnUrl,
+                ct);
 
-        return Result<CancelSubscriptionResponse>.Success(new CancelSubscriptionResponse { PortalUrl = portalUrl });
+            return Result<CancelSubscriptionResponse>.Success(new CancelSubscriptionResponse { PortalUrl = portalUrl });
+        }
+        catch (StripeException)
+        {
+            return Result<CancelSubscriptionResponse>.Failure("already_cancelling", "Assinatura ja esta agendada para cancelamento.");
+        }
     }
 
     public async Task<Result<BundleDownloadResponse>> GetBundleDownloadAsync(
