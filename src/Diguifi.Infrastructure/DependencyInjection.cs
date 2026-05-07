@@ -51,6 +51,8 @@ public static class DependencyInjection
         services.AddScoped<ICheckoutService, CheckoutService>();
         services.AddScoped<IPurchaseService, PurchaseService>();
         services.AddScoped<IStripeWebhookService, StripeWebhookService>();
+        services.AddScoped<IOrderService, OrderService>();
+        services.AddScoped<IBundleService, BundleService>();
         services.AddSingleton<Stripe.IStripeClient>(sp =>
         {
             var options = sp.GetRequiredService<IOptions<StripeOptions>>().Value;
@@ -59,6 +61,7 @@ public static class DependencyInjection
         services.AddSingleton<ITokenService, JwtTokenService>();
         services.AddSingleton<IGoogleTokenValidator, GoogleTokenValidator>();
         services.AddSingleton<IStripeCheckoutGateway, StripeCheckoutGateway>();
+        services.AddSingleton<IStripeBillingPortalGateway, StripeBillingPortalGateway>();
 
         return services;
     }

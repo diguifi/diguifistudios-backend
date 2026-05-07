@@ -241,6 +241,84 @@ public sealed class StripeWebhookServiceTests
         evt.Provider.Should().Be("stripe");
     }
 
+    // ── customer.subscription.deleted ───────────────────────────────────────
+
+    [Fact]
+    public async Task ProcessAsync_SubscriptionDeleted_MarksOrderAsCancelledAndSetsCancelledAt()
+    {
+        await using var db = DbContextFactory.Create();
+        var (_, orderId) = await SeedPaidSubscriptionOrder(db, subscriptionId: "sub_del");
+
+        var payload = StripeWebhookHelper.SubscriptionDeletedPayload("evt_sub_del", "sub_del");
+        var sig = StripeWebhookHelper.Sign(payload, WebhookSecret);
+
+        await BuildSut(db).ProcessAsync(payload, sig, CancellationToken.None);
+
+        var order = db.Orders.Single(o => o.Id == orderId);
+        order.Status.Should().Be(OrderStatus.Cancelled);
+        order.CancelledAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task ProcessAsync_SubscriptionDeleted_UnknownSubscriptionId_ReturnsSuccess()
+    {
+        await using var db = DbContextFactory.Create();
+
+        var payload = StripeWebhookHelper.SubscriptionDeletedPayload("evt_sub_unk", "sub_unknown");
+        var sig = StripeWebhookHelper.Sign(payload, WebhookSecret);
+
+        var result = await BuildSut(db).ProcessAsync(payload, sig, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+    }
+
+    // ── checkout.session.completed — subscription & customer ─────────────────
+
+    [Fact]
+    public async Task ProcessAsync_SessionCompleted_WithSubscriptionId_PersistsStripeSubscriptionIdOnOrder()
+    {
+        await using var db = DbContextFactory.Create();
+        var orderId = await SeedPendingOrder(db, sessionId: "cs_sub_persist");
+
+        var payload = StripeWebhookHelper.SessionCompletedWithSubscriptionPayload(
+            "evt_sub_p", "cs_sub_persist", orderId.ToString(), subscriptionId: "sub_new_123");
+        var sig = StripeWebhookHelper.Sign(payload, WebhookSecret);
+
+        await BuildSut(db).ProcessAsync(payload, sig, CancellationToken.None);
+
+        db.Orders.Single().StripeSubscriptionId.Should().Be("sub_new_123");
+    }
+
+    [Fact]
+    public async Task ProcessAsync_SessionCompleted_WithCustomerId_PersistsStripeCustomerIdOnUser()
+    {
+        await using var db = DbContextFactory.Create();
+        var (userId, orderId) = await SeedPendingOrderWithUser(db, sessionId: "cs_cus_persist");
+
+        var payload = StripeWebhookHelper.SessionCompletedWithSubscriptionPayload(
+            "evt_cus_p", "cs_cus_persist", orderId.ToString(), customerId: "cus_new_456");
+        var sig = StripeWebhookHelper.Sign(payload, WebhookSecret);
+
+        await BuildSut(db).ProcessAsync(payload, sig, CancellationToken.None);
+
+        db.Users.Single(u => u.Id == userId).StripeCustomerId.Should().Be("cus_new_456");
+    }
+
+    [Fact]
+    public async Task ProcessAsync_SessionCompleted_UserAlreadyHasStripeCustomerId_DoesNotOverwrite()
+    {
+        await using var db = DbContextFactory.Create();
+        var (_, orderId) = await SeedPendingOrderWithUser(db, sessionId: "cs_cus_keep", existingCustomerId: "cus_existing");
+
+        var payload = StripeWebhookHelper.SessionCompletedWithSubscriptionPayload(
+            "evt_cus_k", "cs_cus_keep", orderId.ToString(), customerId: "cus_should_not_overwrite");
+        var sig = StripeWebhookHelper.Sign(payload, WebhookSecret);
+
+        await BuildSut(db).ProcessAsync(payload, sig, CancellationToken.None);
+
+        db.Users.Single().StripeCustomerId.Should().Be("cus_existing");
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────────
 
     private static StripeWebhookService BuildSut(AppDbContext db,
@@ -275,5 +353,47 @@ public sealed class StripeWebhookServiceTests
         db.Orders.Add(order);
         await db.SaveChangesAsync();
         return order.Id;
+    }
+
+    private static async Task<(Guid userId, Guid orderId)> SeedPendingOrderWithUser(
+        AppDbContext db, string? sessionId = null, string? existingCustomerId = null)
+    {
+        var user = new User { Email = "u@example.com", Name = "U", FirstName = "U", StripeCustomerId = existingCustomerId };
+        var product = new Product { Id = "p-wh-u", Slug = "su", Name = "P", Description = "D", Price = 10m, Currency = "BRL" };
+        var order = new Order
+        {
+            UserId = user.Id,
+            ProductId = product.Id,
+            Status = OrderStatus.Pending,
+            Amount = 10m,
+            Currency = "BRL",
+            StripeCheckoutSessionId = sessionId
+        };
+        db.Users.Add(user);
+        db.Products.Add(product);
+        db.Orders.Add(order);
+        await db.SaveChangesAsync();
+        return (user.Id, order.Id);
+    }
+
+    private static async Task<(Guid userId, Guid orderId)> SeedPaidSubscriptionOrder(
+        AppDbContext db, string subscriptionId)
+    {
+        var user = new User { Email = "u@example.com", Name = "U", FirstName = "U", StripeCustomerId = "cus_test" };
+        var product = new Product { Id = "p-wh-sub", Slug = "ss", Name = "P", Description = "D", Price = 10m, Currency = "BRL" };
+        var order = new Order
+        {
+            UserId = user.Id,
+            ProductId = product.Id,
+            Status = OrderStatus.Paid,
+            Amount = 10m,
+            Currency = "BRL",
+            StripeSubscriptionId = subscriptionId
+        };
+        db.Users.Add(user);
+        db.Products.Add(product);
+        db.Orders.Add(order);
+        await db.SaveChangesAsync();
+        return (user.Id, order.Id);
     }
 }

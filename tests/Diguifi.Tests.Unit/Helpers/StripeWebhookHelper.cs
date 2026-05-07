@@ -127,6 +127,62 @@ internal static class StripeWebhookHelper
         }
         """;
 
+    internal static string SubscriptionDeletedPayload(string eventId, string subscriptionId) => $$"""
+        {
+          "id": "{{eventId}}",
+          "object": "event",
+          "api_version": "2026-03-25.dahlia",
+          "created": 1700000000,
+          "type": "customer.subscription.deleted",
+          "data": {
+            "object": {
+              "id": "{{subscriptionId}}",
+              "object": "subscription",
+              "customer": "cus_test",
+              "status": "canceled",
+              "current_period_start": 1700000000,
+              "current_period_end": 1703000000,
+              "livemode": false,
+              "items": {
+                "object": "list",
+                "data": [],
+                "has_more": false,
+                "total_count": 0,
+                "url": "/v1/subscription_items"
+              }
+            }
+          }
+        }
+        """;
+
+    internal static string SessionCompletedWithSubscriptionPayload(
+        string eventId, string sessionId, string orderId,
+        string? subscriptionId = null, string? customerId = null) => $$"""
+        {
+          "id": "{{eventId}}",
+          "object": "event",
+          "api_version": "2026-03-25.dahlia",
+          "created": 1700000000,
+          "type": "checkout.session.completed",
+          "data": {
+            "object": {
+              "id": "{{sessionId}}",
+              "object": "checkout.session",
+              "subscription": {{(subscriptionId is null ? "null" : $"\"{subscriptionId}\"")}},
+              "customer": {{(customerId is null ? "null" : $"\"{customerId}\"")}},
+              "payment_intent": null,
+              "metadata": { "orderId": "{{orderId}}", "productId": "prod-1" },
+              "payment_status": "paid",
+              "status": "complete",
+              "mode": "subscription",
+              "livemode": false,
+              "amount_total": 1000,
+              "currency": "brl"
+            }
+          }
+        }
+        """;
+
     internal static string UnknownEventPayload(string eventId) => $$"""
         {
           "id": "{{eventId}}",

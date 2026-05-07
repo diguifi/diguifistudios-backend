@@ -1,15 +1,23 @@
+using Diguifi.Application.Interfaces;
+using Diguifi.Infrastructure.Options;
 using Diguifi.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Diguifi.Api.Controllers;
 
 [ApiController]
 [Route("api/orders")]
 [Authorize]
-public sealed class OrdersController(AppDbContext dbContext) : ControllerBase
+public sealed class OrdersController(
+    AppDbContext dbContext,
+    IOrderService orderService,
+    IOptions<FrontendOptions> frontendOptions) : ControllerBase
 {
+    private readonly FrontendOptions _frontend = frontendOptions.Value;
+
     [HttpGet]
     public async Task<IActionResult> GetMine(CancellationToken cancellationToken)
     {
@@ -24,6 +32,7 @@ public sealed class OrdersController(AppDbContext dbContext) : ControllerBase
             {
                 id = x.Id,
                 productName = x.Product != null ? x.Product.Name : x.ProductId,
+                productCategory = x.Product != null ? x.Product.Category.ToString().ToLowerInvariant() : "unknown",
                 status = x.Status.ToString().ToLowerInvariant(),
                 amount = x.Amount,
                 currency = x.Currency,
@@ -46,6 +55,7 @@ public sealed class OrdersController(AppDbContext dbContext) : ControllerBase
                 id = x.Id,
                 userId = x.UserId,
                 productId = x.ProductId,
+                productCategory = x.Product != null ? x.Product.Category.ToString().ToLowerInvariant() : "unknown",
                 status = x.Status.ToString().ToLowerInvariant(),
                 amount = x.Amount,
                 currency = x.Currency,
@@ -56,5 +66,38 @@ public sealed class OrdersController(AppDbContext dbContext) : ControllerBase
             .FirstOrDefaultAsync(cancellationToken);
 
         return order is null ? NotFound() : Ok(order);
+    }
+
+    [HttpPost("{orderId:guid}/cancel-subscription")]
+    public async Task<IActionResult> CancelSubscription(Guid orderId, CancellationToken cancellationToken)
+    {
+        var userId = Program.TryGetUserId(User);
+        if (userId is null) return Unauthorized();
+
+        var returnUrl = $"{_frontend.BaseUrl}/#/orders";
+        var result = await orderService.CancelSubscriptionAsync(orderId, userId.Value, returnUrl, cancellationToken);
+
+        if (!result.IsSuccess)
+            return result.Error!.Code == "order_not_found"
+                ? NotFound(result.Error)
+                : BadRequest(result.Error);
+
+        return Ok(result.Value);
+    }
+
+    [HttpGet("{orderId:guid}/bundle-download")]
+    public async Task<IActionResult> BundleDownload(Guid orderId, CancellationToken cancellationToken)
+    {
+        var userId = Program.TryGetUserId(User);
+        if (userId is null) return Unauthorized();
+
+        var result = await orderService.GetBundleDownloadAsync(orderId, userId.Value, cancellationToken);
+
+        if (!result.IsSuccess)
+            return result.Error!.Code == "order_not_found"
+                ? NotFound(result.Error)
+                : BadRequest(result.Error);
+
+        return Ok(result.Value);
     }
 }

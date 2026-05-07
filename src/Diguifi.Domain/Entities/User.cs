@@ -10,6 +10,7 @@ public sealed class User
     public string AvatarUrl { get; set; } = string.Empty;
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset LastLoginAt { get; set; } = DateTimeOffset.UtcNow;
+    public string? StripeCustomerId { get; set; }
 
     public ICollection<RefreshToken> RefreshTokens { get; set; } = [];
     public ICollection<Order> Orders { get; set; } = [];

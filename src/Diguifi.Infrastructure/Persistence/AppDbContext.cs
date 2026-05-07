@@ -10,6 +10,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<Product> Products => Set<Product>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<WebhookEvent> WebhookEvents => Set<WebhookEvent>();
+    public DbSet<Bundle> Bundles => Set<Bundle>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -46,6 +47,14 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.HasKey(x => x.Id);
             entity.HasIndex(x => new { x.Provider, x.ExternalEventId }).IsUnique();
+        });
+
+        modelBuilder.Entity<Bundle>(b =>
+        {
+            b.HasKey(x => x.ProductId);
+            b.HasOne(x => x.Product)
+             .WithOne()
+             .HasForeignKey<Bundle>(x => x.ProductId);
         });
     }
 }

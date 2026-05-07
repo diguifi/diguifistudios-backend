@@ -15,6 +15,7 @@ public sealed class Order
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? PaidAt { get; set; }
     public DateTimeOffset? CancelledAt { get; set; }
+    public string? StripeSubscriptionId { get; set; }
 
     public User? User { get; set; }
     public Product? Product { get; set; }

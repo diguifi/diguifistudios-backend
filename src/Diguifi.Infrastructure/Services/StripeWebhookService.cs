@@ -79,6 +79,11 @@ public sealed class StripeWebhookService(
             order = await dbContext.Orders.FirstOrDefaultAsync(x => x.Id == orderId, cancellationToken);
         }
 
+        if (order is null && stripeEvent.Data.Object is Subscription stripeSubscription)
+        {
+            order = await dbContext.Orders.FirstOrDefaultAsync(x => x.StripeSubscriptionId == stripeSubscription.Id, cancellationToken);
+        }
+
         if (order is not null)
         {
             if (!string.IsNullOrWhiteSpace(sessionId))
@@ -89,6 +94,19 @@ public sealed class StripeWebhookService(
             if (!string.IsNullOrWhiteSpace(paymentIntentId))
             {
                 order.StripePaymentIntentId = paymentIntentId;
+            }
+
+            if (stripeEvent.Data.Object is Session completedSession)
+            {
+                if (!string.IsNullOrWhiteSpace(completedSession.SubscriptionId))
+                    order.StripeSubscriptionId = completedSession.SubscriptionId;
+
+                if (!string.IsNullOrWhiteSpace(completedSession.CustomerId))
+                {
+                    var user = await dbContext.Users.FirstOrDefaultAsync(u => u.Id == order.UserId, cancellationToken);
+                    if (user is not null && string.IsNullOrWhiteSpace(user.StripeCustomerId))
+                        user.StripeCustomerId = completedSession.CustomerId;
+                }
             }
 
             ApplyOrderTransition(order, stripeEvent.Type);
@@ -191,6 +209,10 @@ public sealed class StripeWebhookService(
                 break;
             case "charge.refunded":
                 order.Status = OrderStatus.Refunded;
+                break;
+            case "customer.subscription.deleted":
+                order.Status = OrderStatus.Cancelled;
+                order.CancelledAt = DateTimeOffset.UtcNow;
                 break;
         }
     }
