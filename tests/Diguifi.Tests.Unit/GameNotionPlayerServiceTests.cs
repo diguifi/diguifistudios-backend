@@ -1,5 +1,7 @@
 using Diguifi.Application.DTOs.GameNotionPlayers;
 using Diguifi.Domain.Entities;
+using Diguifi.Domain.Enums;
+using Diguifi.Infrastructure.Persistence;
 using Diguifi.Infrastructure.Services;
 using Diguifi.Tests.Unit.Helpers;
 using FluentAssertions;
@@ -150,5 +152,115 @@ public sealed class GameNotionPlayerServiceTests
 
         result.IsSuccess.Should().BeFalse();
         result.Error!.Code.Should().Be("player_not_found");
+    }
+
+    // ── SetPlayerIdAsync ─────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task SetPlayerIdAsync_UserHasNoBundleOrder_ReturnsNoBundleAccess()
+    {
+        await using var db = DbContextFactory.Create();
+
+        var result = await new GameNotionPlayerService(db)
+            .SetPlayerIdAsync(Guid.NewGuid(), new SetPlayerIdRequest { PlayerId = "player-x" }, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error!.Code.Should().Be("no_bundle_access");
+    }
+
+    [Fact]
+    public async Task SetPlayerIdAsync_PlayerIdTakenByAnotherUser_ReturnsPlayerIdTaken()
+    {
+        await using var db = DbContextFactory.Create();
+        var userId = Guid.NewGuid();
+        await SeedBundleOrder(db, userId);
+        db.GameNotionPlayers.Add(new GameNotionPlayer { PlayerId = "taken", UserId = Guid.NewGuid(), LastPing = FixedPing });
+        await db.SaveChangesAsync();
+
+        var result = await new GameNotionPlayerService(db)
+            .SetPlayerIdAsync(userId, new SetPlayerIdRequest { PlayerId = "taken" }, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error!.Code.Should().Be("player_id_taken");
+    }
+
+    [Fact]
+    public async Task SetPlayerIdAsync_NewPlayerId_CreatesRecord()
+    {
+        await using var db = DbContextFactory.Create();
+        var userId = Guid.NewGuid();
+        await SeedBundleOrder(db, userId);
+
+        var result = await new GameNotionPlayerService(db)
+            .SetPlayerIdAsync(userId, new SetPlayerIdRequest { PlayerId = "new-player" }, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.PlayerId.Should().Be("new-player");
+        db.GameNotionPlayers.Should().ContainSingle(p => p.PlayerId == "new-player" && p.UserId == userId);
+    }
+
+    [Fact]
+    public async Task SetPlayerIdAsync_UserAlreadyHasDifferentPlayerId_ReplacesOldWithNew()
+    {
+        await using var db = DbContextFactory.Create();
+        var userId = Guid.NewGuid();
+        await SeedBundleOrder(db, userId);
+        db.GameNotionPlayers.Add(new GameNotionPlayer { PlayerId = "old-player", UserId = userId, LastPing = FixedPing });
+        await db.SaveChangesAsync();
+
+        var result = await new GameNotionPlayerService(db)
+            .SetPlayerIdAsync(userId, new SetPlayerIdRequest { PlayerId = "new-player" }, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.PlayerId.Should().Be("new-player");
+        db.GameNotionPlayers.Should().NotContain(p => p.PlayerId == "old-player");
+        db.GameNotionPlayers.Should().ContainSingle(p => p.PlayerId == "new-player" && p.UserId == userId);
+    }
+
+    [Fact]
+    public async Task SetPlayerIdAsync_UserAlreadyHasSamePlayerId_ReturnsSuccessWithoutChanges()
+    {
+        await using var db = DbContextFactory.Create();
+        var userId = Guid.NewGuid();
+        await SeedBundleOrder(db, userId);
+        db.GameNotionPlayers.Add(new GameNotionPlayer { PlayerId = "same-player", UserId = userId, LastPing = FixedPing });
+        await db.SaveChangesAsync();
+
+        var result = await new GameNotionPlayerService(db)
+            .SetPlayerIdAsync(userId, new SetPlayerIdRequest { PlayerId = "same-player" }, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.PlayerId.Should().Be("same-player");
+        db.GameNotionPlayers.Should().ContainSingle(p => p.PlayerId == "same-player");
+    }
+
+    [Fact]
+    public async Task SetPlayerIdAsync_AdminCreatedUnlinkedRecord_UserClaimsIt()
+    {
+        await using var db = DbContextFactory.Create();
+        var userId = Guid.NewGuid();
+        await SeedBundleOrder(db, userId);
+        db.GameNotionPlayers.Add(new GameNotionPlayer { PlayerId = "admin-made", UserId = null, LastPing = FixedPing });
+        await db.SaveChangesAsync();
+
+        var result = await new GameNotionPlayerService(db)
+            .SetPlayerIdAsync(userId, new SetPlayerIdRequest { PlayerId = "admin-made" }, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.PlayerId.Should().Be("admin-made");
+        db.GameNotionPlayers.Single(p => p.PlayerId == "admin-made").UserId.Should().Be(userId);
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    private static async Task SeedBundleOrder(AppDbContext db, Guid userId)
+    {
+        if (!db.Products.Any(p => p.Id == "bundle-prod"))
+        {
+            db.Products.Add(new Product { Id = "bundle-prod", Slug = "bundle-prod", Name = "Bundle", Description = "D", Price = 49.9m, Currency = "BRL", Category = ProductCategory.Bundle });
+            db.Bundles.Add(new Bundle { ProductId = "bundle-prod", DriveUrl = "https://drive.google.com/x", FileName = "pack.zip", BundleType = BundleType.GameNotion });
+        }
+        db.Orders.Add(new Order { UserId = userId, ProductId = "bundle-prod", Status = OrderStatus.Paid, Amount = 49.9m });
+        await db.SaveChangesAsync();
     }
 }

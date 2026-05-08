@@ -10,4 +10,5 @@ public interface IGameNotionPlayerService
     Task<Result<GameNotionPlayerResponse>> CreateAsync(CreateGameNotionPlayerRequest request, CancellationToken ct);
     Task<Result<GameNotionPlayerResponse>> UpdateAsync(string playerId, UpdateGameNotionPlayerRequest request, CancellationToken ct);
     Task<Result<bool>> DeleteAsync(string playerId, CancellationToken ct);
+    Task<Result<GameNotionPlayerResponse>> SetPlayerIdAsync(Guid userId, SetPlayerIdRequest request, CancellationToken ct);
 }

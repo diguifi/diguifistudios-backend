@@ -62,6 +62,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             e.HasKey(x => x.PlayerId);
             e.Property(x => x.PlayerId).HasMaxLength(100);
+            e.HasOne(x => x.User)
+             .WithMany()
+             .HasForeignKey(x => x.UserId)
+             .OnDelete(DeleteBehavior.SetNull);
         });
     }
 }

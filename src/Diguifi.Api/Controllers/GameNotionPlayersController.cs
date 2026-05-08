@@ -7,14 +7,15 @@ namespace Diguifi.Api.Controllers;
 
 [ApiController]
 [Route("api/game-notion-players")]
-[Authorize(Roles = "admin")]
 public sealed class GameNotionPlayersController(IGameNotionPlayerService service) : ControllerBase
 {
+    [Authorize(Roles = "admin")]
     [HttpGet]
     [ProducesResponseType<IReadOnlyCollection<GameNotionPlayerResponse>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
         => Ok(await service.GetAllAsync(cancellationToken));
 
+    [Authorize(Roles = "admin")]
     [HttpGet("{playerId}")]
     [ProducesResponseType<GameNotionPlayerResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -24,6 +25,7 @@ public sealed class GameNotionPlayersController(IGameNotionPlayerService service
         return player is null ? NotFound() : Ok(player);
     }
 
+    [Authorize(Roles = "admin")]
     [HttpPost]
     [ProducesResponseType<GameNotionPlayerResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -35,6 +37,7 @@ public sealed class GameNotionPlayersController(IGameNotionPlayerService service
             : BadRequest(result.Error);
     }
 
+    [Authorize(Roles = "admin")]
     [HttpPut("{playerId}")]
     [ProducesResponseType<GameNotionPlayerResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -47,6 +50,7 @@ public sealed class GameNotionPlayersController(IGameNotionPlayerService service
         return Ok(result.Value);
     }
 
+    [Authorize(Roles = "admin")]
     [HttpDelete("{playerId}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -56,5 +60,22 @@ public sealed class GameNotionPlayersController(IGameNotionPlayerService service
         if (!result.IsSuccess)
             return result.Error?.Code == "player_not_found" ? NotFound(result.Error) : BadRequest(result.Error);
         return NoContent();
+    }
+
+    [Authorize]
+    [HttpPut("me")]
+    [ProducesResponseType<GameNotionPlayerResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> SetMyPlayerId([FromBody] SetPlayerIdRequest request, CancellationToken cancellationToken)
+    {
+        var userId = Program.TryGetUserId(User);
+        if (userId is null)
+            return Unauthorized();
+
+        var result = await service.SetPlayerIdAsync(userId.Value, request, cancellationToken);
+        if (!result.IsSuccess)
+            return BadRequest(result.Error);
+        return Ok(result.Value);
     }
 }
