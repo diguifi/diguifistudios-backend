@@ -36,6 +36,50 @@ public sealed class BundleService(AppDbContext dbContext) : IBundleService
         return Result<bool>.Success(true);
     }
 
+    public async Task<IReadOnlyCollection<BundleResponse>> GetAllAsync(CancellationToken ct)
+    {
+        return await dbContext.Bundles
+            .Include(b => b.Product)
+            .Select(b => new BundleResponse
+            {
+                ProductId = b.ProductId,
+                ProductName = b.Product!.Name,
+                DriveUrl = b.DriveUrl,
+                FileName = b.FileName,
+                UpdatedAt = b.UpdatedAt
+            })
+            .ToListAsync(ct);
+    }
+
+    public async Task<BundleResponse?> GetByProductIdAsync(string productId, CancellationToken ct)
+    {
+        var bundle = await dbContext.Bundles
+            .Include(b => b.Product)
+            .FirstOrDefaultAsync(b => b.ProductId == productId, ct);
+
+        if (bundle is null) return null;
+
+        return new BundleResponse
+        {
+            ProductId = bundle.ProductId,
+            ProductName = bundle.Product!.Name,
+            DriveUrl = bundle.DriveUrl,
+            FileName = bundle.FileName,
+            UpdatedAt = bundle.UpdatedAt
+        };
+    }
+
+    public async Task<Result<bool>> DeleteAsync(string productId, CancellationToken ct)
+    {
+        var bundle = await dbContext.Bundles.FirstOrDefaultAsync(b => b.ProductId == productId, ct);
+        if (bundle is null)
+            return Result<bool>.Failure("bundle_not_found", "Bundle nao encontrado.");
+
+        dbContext.Bundles.Remove(bundle);
+        await dbContext.SaveChangesAsync(ct);
+        return Result<bool>.Success(true);
+    }
+
     public async Task<Result<BundleDownloadResponse>> GetAsync(string productId, CancellationToken ct)
     {
         var bundle = await dbContext.Bundles.FirstOrDefaultAsync(b => b.ProductId == productId, ct);

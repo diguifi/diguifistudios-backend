@@ -10,10 +10,10 @@ namespace Diguifi.Infrastructure.Services;
 
 public sealed class ProductService(AppDbContext dbContext) : IProductService
 {
-    public async Task<IReadOnlyCollection<ProductResponse>> GetProductsAsync(Guid? userId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyCollection<ProductResponse>> GetProductsAsync(Guid? userId, CancellationToken cancellationToken, bool includeInactive = false)
         => await dbContext.Products
             .AsNoTracking()
-            .Where(x => x.IsActive)
+            .Where(x => includeInactive || x.IsActive)
             .Select(x => new ProductResponse
             {
                 Id = x.Id,
