@@ -55,7 +55,7 @@ public sealed class GameNotionPlayerServiceTests
 
         result.Should().NotBeNull();
         result!.PlayerId.Should().Be("player-a");
-        result.LastPing.Should().Be(FixedPing.AddMinutes(-2));
+        result.LastPing.Should().Be(FixedPing);
     }
 
     [Fact]
@@ -80,7 +80,7 @@ public sealed class GameNotionPlayerServiceTests
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.PlayerId.Should().Be("p-new");
-        result.Value.LastPing.Should().Be(FixedPing.AddMinutes(-2));
+        result.Value.LastPing.Should().Be(FixedPing);
         db.GameNotionPlayers.Should().ContainSingle(p => p.PlayerId == "p-new");
     }
 

@@ -67,7 +67,6 @@ public sealed class NotificationService(AppDbContext dbContext) : INotificationS
         if (ids.Count == 0) return;
 
         var entities = await dbContext.Notifications
-            .AsNoTracking()
             .Where(n => ids.Contains(n.Id) && n.UserId == userId && !n.IsRead)
             .ToListAsync(ct);
 
@@ -76,7 +75,6 @@ public sealed class NotificationService(AppDbContext dbContext) : INotificationS
         foreach (var e in entities)
             e.IsRead = true;
 
-        dbContext.Notifications.UpdateRange(entities);
         await dbContext.SaveChangesAsync(ct);
     }
 
