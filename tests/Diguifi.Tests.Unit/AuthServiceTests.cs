@@ -292,6 +292,47 @@ public sealed class AuthServiceTests
         result.Value!.IsAdmin.Should().BeTrue();
     }
 
+    [Fact]
+    public async Task GetCurrentUserAsync_WithUnreadNotification_HasNotificationTrue()
+    {
+        await using var db = DbContextFactory.Create();
+        var user = new User { Email = "notify@example.com", Name = "U", FirstName = "U" };
+        db.Users.Add(user);
+        db.Notifications.Add(new Notification { UserId = user.Id, Text = "Hello", IsRead = false });
+        await db.SaveChangesAsync();
+
+        var result = await BuildService(db).GetCurrentUserAsync(user.Id, CancellationToken.None);
+
+        result.Value!.HasNotification.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task GetCurrentUserAsync_AllNotificationsRead_HasNotificationFalse()
+    {
+        await using var db = DbContextFactory.Create();
+        var user = new User { Email = "read@example.com", Name = "U", FirstName = "U" };
+        db.Users.Add(user);
+        db.Notifications.Add(new Notification { UserId = user.Id, Text = "Done", IsRead = true });
+        await db.SaveChangesAsync();
+
+        var result = await BuildService(db).GetCurrentUserAsync(user.Id, CancellationToken.None);
+
+        result.Value!.HasNotification.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GetCurrentUserAsync_NoNotifications_HasNotificationFalse()
+    {
+        await using var db = DbContextFactory.Create();
+        var user = new User { Email = "none@example.com", Name = "U", FirstName = "U" };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        var result = await BuildService(db).GetCurrentUserAsync(user.Id, CancellationToken.None);
+
+        result.Value!.HasNotification.Should().BeFalse();
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────────
 
     private static AuthService BuildService(

@@ -142,9 +142,15 @@ public sealed class AuthService(
     public async Task<Result<UserProfileResponse>> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken)
     {
         var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
-        return user is null
-            ? Result<UserProfileResponse>.Failure("user_not_found", "Usuario autenticado nao encontrado.")
-            : Result<UserProfileResponse>.Success(MapUser(user));
+        if (user is null)
+            return Result<UserProfileResponse>.Failure("user_not_found", "Usuario autenticado nao encontrado.");
+
+        var hasNotification = await dbContext.Notifications
+            .AnyAsync(n => n.UserId == userId && !n.IsRead, cancellationToken);
+
+        var response = MapUser(user);
+        response.HasNotification = hasNotification;
+        return Result<UserProfileResponse>.Success(response);
     }
 
     private static UserProfileResponse MapUser(User user) => new()

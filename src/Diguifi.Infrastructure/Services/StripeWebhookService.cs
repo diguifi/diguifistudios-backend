@@ -109,7 +109,13 @@ public sealed class StripeWebhookService(
                 }
             }
 
+            var statusBefore = order.Status;
             ApplyOrderTransition(order, stripeEvent);
+
+            if (statusBefore != OrderStatus.Paid && order.Status == OrderStatus.Paid)
+            {
+                await MaybeSendGameNotionNotificationAsync(order, cancellationToken);
+            }
         }
 
         webhookEvent.Status = WebhookEventStatus.Processed;
@@ -188,6 +194,22 @@ public sealed class StripeWebhookService(
         };
 
         return Guid.TryParse(orderId, out var parsedOrderId) ? parsedOrderId : null;
+    }
+
+    private async Task MaybeSendGameNotionNotificationAsync(Order order, CancellationToken cancellationToken)
+    {
+        var isGameNotion = await dbContext.Bundles
+            .AnyAsync(b => b.ProductId == order.ProductId && b.BundleType == BundleType.GameNotion, cancellationToken);
+
+        if (!isGameNotion) return;
+
+        dbContext.Notifications.Add(new Notification
+        {
+            UserId = order.UserId,
+            Text = "Download your GameNotion.exe and set up your Player Id now!",
+            Path = "/orders",
+            CreatedAt = DateTimeOffset.UtcNow
+        });
     }
 
     private static void ApplyOrderTransition(Order order, Event stripeEvent)

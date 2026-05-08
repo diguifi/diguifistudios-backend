@@ -8,4 +8,5 @@ public sealed class UserProfileResponse
     public string FirstName { get; set; } = string.Empty;
     public string AvatarUrl { get; set; } = string.Empty;
     public bool IsAdmin { get; set; }
+    public bool HasNotification { get; set; }
 }

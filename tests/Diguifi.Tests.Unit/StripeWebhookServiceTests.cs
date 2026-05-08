@@ -319,6 +319,39 @@ public sealed class StripeWebhookServiceTests
         db.Users.Single().StripeCustomerId.Should().Be("cus_existing");
     }
 
+    // ── GameNotion notification ─────────────────────────────────────────────
+
+    [Fact]
+    public async Task ProcessAsync_SessionCompleted_GameNotionBundle_CreatesNotification()
+    {
+        await using var db = DbContextFactory.Create();
+        var (userId, orderId) = await SeedPendingGameNotionOrder(db, sessionId: "cs_gn");
+
+        var payload = StripeWebhookHelper.SessionCompletedPayload("evt_gn", "cs_gn", orderId.ToString());
+        var sig = StripeWebhookHelper.Sign(payload, WebhookSecret);
+
+        await BuildSut(db).ProcessAsync(payload, sig, CancellationToken.None);
+
+        var notification = db.Notifications.SingleOrDefault(n => n.UserId == userId);
+        notification.Should().NotBeNull();
+        notification!.Text.Should().Be("Download your GameNotion.exe and set up your Player Id now!");
+        notification.Path.Should().Be("/orders");
+    }
+
+    [Fact]
+    public async Task ProcessAsync_SessionCompleted_NonBundleProduct_DoesNotCreateNotification()
+    {
+        await using var db = DbContextFactory.Create();
+        var orderId = await SeedPendingOrder(db, sessionId: "cs_nb");
+
+        var payload = StripeWebhookHelper.SessionCompletedPayload("evt_nb", "cs_nb", orderId.ToString());
+        var sig = StripeWebhookHelper.Sign(payload, WebhookSecret);
+
+        await BuildSut(db).ProcessAsync(payload, sig, CancellationToken.None);
+
+        db.Notifications.Should().BeEmpty();
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────────
 
     private static StripeWebhookService BuildSut(AppDbContext db,
@@ -371,6 +404,29 @@ public sealed class StripeWebhookServiceTests
         };
         db.Users.Add(user);
         db.Products.Add(product);
+        db.Orders.Add(order);
+        await db.SaveChangesAsync();
+        return (user.Id, order.Id);
+    }
+
+    private static async Task<(Guid userId, Guid orderId)> SeedPendingGameNotionOrder(
+        AppDbContext db, string? sessionId = null)
+    {
+        var user = new User { Email = "gn@example.com", Name = "GN", FirstName = "GN" };
+        var product = new Product { Id = "p-gn", Slug = "gn", Name = "GameNotion Bundle", Description = "D", Price = 49.9m, Currency = "BRL", Category = ProductCategory.Bundle };
+        var bundle = new Bundle { ProductId = "p-gn", DriveUrl = "https://drive.google.com/x", FileName = "gn.zip", BundleType = BundleType.GameNotion };
+        var order = new Order
+        {
+            UserId = user.Id,
+            ProductId = product.Id,
+            Status = OrderStatus.Pending,
+            Amount = 49.9m,
+            Currency = "BRL",
+            StripeCheckoutSessionId = sessionId
+        };
+        db.Users.Add(user);
+        db.Products.Add(product);
+        db.Bundles.Add(bundle);
         db.Orders.Add(order);
         await db.SaveChangesAsync();
         return (user.Id, order.Id);

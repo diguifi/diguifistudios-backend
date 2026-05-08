@@ -12,6 +12,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<WebhookEvent> WebhookEvents => Set<WebhookEvent>();
     public DbSet<Bundle> Bundles => Set<Bundle>();
     public DbSet<GameNotionPlayer> GameNotionPlayers => Set<GameNotionPlayer>();
+    public DbSet<Notification> Notifications => Set<Notification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -66,6 +67,16 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
              .WithMany()
              .HasForeignKey(x => x.UserId)
              .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<Notification>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasOne(x => x.User)
+             .WithMany()
+             .HasForeignKey(x => x.UserId)
+             .OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => new { x.UserId, x.CreatedAt });
         });
     }
 }
