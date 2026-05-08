@@ -25,7 +25,7 @@ public sealed class BundlesController(IBundleService bundleService) : Controller
     }
 
     [HttpPut("{productId}")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Upsert(string productId, [FromBody] UpsertBundleRequest request, CancellationToken cancellationToken)
@@ -33,7 +33,7 @@ public sealed class BundlesController(IBundleService bundleService) : Controller
         var result = await bundleService.UpsertAsync(productId, request, cancellationToken);
         if (!result.IsSuccess)
             return result.Error?.Code == "product_not_found" ? NotFound(result.Error) : BadRequest(result.Error);
-        return Ok();
+        return NoContent();
     }
 
     [HttpDelete("{productId}")]
