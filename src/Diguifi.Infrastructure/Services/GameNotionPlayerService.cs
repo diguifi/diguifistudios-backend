@@ -89,11 +89,11 @@ public sealed class GameNotionPlayerService(AppDbContext dbContext) : IGameNotio
         if (target is not null)
         {
             target.UserId = userId;
-            target.LastPing = DateTime.UtcNow;
+            target.LastPing = DateTime.UtcNow.AddMinutes(-2);
         }
         else
         {
-            target = new GameNotionPlayer { PlayerId = request.PlayerId, UserId = userId, LastPing = DateTime.UtcNow };
+            target = new GameNotionPlayer { PlayerId = request.PlayerId, UserId = userId, LastPing = DateTime.UtcNow.AddMinutes(-2) };
             dbContext.GameNotionPlayers.Add(target);
         }
 
