@@ -14,8 +14,12 @@ public sealed class ProductsController(
 {
     [HttpGet]
     [ProducesResponseType<IReadOnlyCollection<ProductResponse>>(StatusCodes.Status200OK)]
-    public async Task<IActionResult> Get(CancellationToken cancellationToken)
-        => Ok(await productService.GetProductsAsync(Program.TryGetUserId(User), cancellationToken, includeInactive: User.IsInRole("admin")));
+    public async Task<IActionResult> Get([FromQuery] bool includeInactive = false, CancellationToken cancellationToken = default)
+    {
+        if (includeInactive && !User.IsInRole("admin"))
+            return Forbid();
+        return Ok(await productService.GetProductsAsync(Program.TryGetUserId(User), cancellationToken, includeInactive));
+    }
 
     [HttpGet("{id}")]
     [ProducesResponseType<ProductResponse>(StatusCodes.Status200OK)]

@@ -11,6 +11,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<WebhookEvent> WebhookEvents => Set<WebhookEvent>();
     public DbSet<Bundle> Bundles => Set<Bundle>();
+    public DbSet<GameNotionPlayer> GameNotionPlayers => Set<GameNotionPlayer>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -55,6 +56,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             b.HasOne(x => x.Product)
              .WithOne()
              .HasForeignKey<Bundle>(x => x.ProductId);
+        });
+
+        modelBuilder.Entity<GameNotionPlayer>(e =>
+        {
+            e.HasKey(x => x.PlayerId);
+            e.Property(x => x.PlayerId).HasMaxLength(100);
         });
     }
 }

@@ -53,6 +53,7 @@ public static class DependencyInjection
         services.AddScoped<IStripeWebhookService, StripeWebhookService>();
         services.AddScoped<IOrderService, OrderService>();
         services.AddScoped<IBundleService, BundleService>();
+        services.AddScoped<IGameNotionPlayerService, GameNotionPlayerService>();
         services.AddSingleton<Stripe.IStripeClient>(sp =>
         {
             var options = sp.GetRequiredService<IOptions<StripeOptions>>().Value;
