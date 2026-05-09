@@ -42,6 +42,20 @@ public sealed class GameNotionPlayerService(AppDbContext dbContext) : IGameNotio
         if (entity is null)
             return Result<GameNotionPlayerResponse>.Failure("player_not_found", "Player não encontrado.");
 
+        var newId = request.NewPlayerId;
+        if (!string.IsNullOrWhiteSpace(newId) && newId != playerId)
+        {
+            var taken = await dbContext.GameNotionPlayers.AnyAsync(p => p.PlayerId == newId, ct);
+            if (taken)
+                return Result<GameNotionPlayerResponse>.Failure("player_already_exists", "Já existe um player com esse ID.");
+
+            var replacement = new GameNotionPlayer { PlayerId = newId, UserId = entity.UserId, LastPing = request.LastPing };
+            dbContext.GameNotionPlayers.Remove(entity);
+            dbContext.GameNotionPlayers.Add(replacement);
+            await dbContext.SaveChangesAsync(ct);
+            return Result<GameNotionPlayerResponse>.Success(new GameNotionPlayerResponse { PlayerId = replacement.PlayerId, LastPing = replacement.LastPing });
+        }
+
         entity.LastPing = request.LastPing;
         await dbContext.SaveChangesAsync(ct);
 

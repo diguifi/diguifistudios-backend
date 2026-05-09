@@ -128,6 +128,38 @@ public sealed class GameNotionPlayerServiceTests
         result.Error!.Code.Should().Be("player_not_found");
     }
 
+    [Fact]
+    public async Task UpdateAsync_WithNewPlayerId_RenamesRecord()
+    {
+        await using var db = DbContextFactory.Create();
+        db.GameNotionPlayers.Add(new GameNotionPlayer { PlayerId = "old-id", LastPing = FixedPing });
+        await db.SaveChangesAsync();
+
+        var result = await new GameNotionPlayerService(db)
+            .UpdateAsync("old-id", new UpdateGameNotionPlayerRequest { NewPlayerId = "new-id", LastPing = FixedPing }, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.PlayerId.Should().Be("new-id");
+        db.GameNotionPlayers.Should().NotContain(p => p.PlayerId == "old-id");
+        db.GameNotionPlayers.Should().ContainSingle(p => p.PlayerId == "new-id");
+    }
+
+    [Fact]
+    public async Task UpdateAsync_NewPlayerIdAlreadyExists_ReturnsPlayerAlreadyExists()
+    {
+        await using var db = DbContextFactory.Create();
+        db.GameNotionPlayers.AddRange(
+            new GameNotionPlayer { PlayerId = "existing", LastPing = FixedPing },
+            new GameNotionPlayer { PlayerId = "target", LastPing = FixedPing });
+        await db.SaveChangesAsync();
+
+        var result = await new GameNotionPlayerService(db)
+            .UpdateAsync("target", new UpdateGameNotionPlayerRequest { NewPlayerId = "existing", LastPing = FixedPing }, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error!.Code.Should().Be("player_already_exists");
+    }
+
     // ── DeleteAsync ──────────────────────────────────────────────────────────
 
     [Fact]
